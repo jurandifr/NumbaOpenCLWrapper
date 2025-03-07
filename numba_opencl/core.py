@@ -1,4 +1,9 @@
 
+"""
+Módulo principal que implementa a funcionalidade OpenCL
+Fornece uma API compatível com numba.cuda para OpenCL
+"""
+
 import numpy as np
 import pyopencl as cl
 import threading
@@ -9,6 +14,13 @@ from .utils import inspect_function_source, random_id
 
 # Módulo personalizado numba.opencl
 class OpenCLExtension:
+    """
+    Classe principal que implementa a funcionalidade do OpenCL como uma extensão Numba.
+    
+    Esta classe oferece uma API similar ao numba.cuda, mas utilizando PyOpenCL como backend.
+    Suporta compilação JIT de kernels Python para código OpenCL C, gerenciamento de memória,
+    e execução de kernels em dispositivos compatíveis com OpenCL.
+    """
     def __init__(self):
         # Inicialização básica do contexto OpenCL
         try:
