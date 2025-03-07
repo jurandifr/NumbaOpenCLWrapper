@@ -1,7 +1,67 @@
+
 import numpy as np
 import time
 from numba_opencl import opencl
 from numba_opencl.utils import check_opencl_support
+
+def print_device_selection_menu():
+    """Exibe menu de seleção de dispositivos"""
+    print("\n=== Seleção de Dispositivos OpenCL ===")
+    
+    devices = opencl.list_devices()
+    if not devices:
+        print("Nenhum dispositivo OpenCL detectado.")
+        return False
+    
+    print("Dispositivos disponíveis:")
+    for device in devices:
+        current = " (atual)" if device['current'] else ""
+        print(f"  {device['id']}: {device['name']} ({device['type']}) - {device['platform']}{current}")
+    
+    print("\nOpções:")
+    print("  1. Selecionar dispositivo pelo ID")
+    print("  2. Selecionar GPU (se disponível)")
+    print("  3. Selecionar CPU (se disponível)")
+    print("  4. Usar dispositivo atual")
+    print("  5. Exibir informações detalhadas do dispositivo atual")
+    
+    try:
+        choice = input("\nEscolha uma opção (1-5): ")
+        
+        if choice == "1":
+            device_id = int(input("Digite o ID do dispositivo: "))
+            if opencl.select_device(device_id):
+                print(f"Dispositivo #{device_id} selecionado com sucesso.")
+            else:
+                print(f"Erro ao selecionar dispositivo #{device_id}.")
+        elif choice == "2":
+            if opencl.select_device_by_type('GPU'):
+                print("Dispositivo GPU selecionado com sucesso.")
+            else:
+                print("Não foi possível selecionar um dispositivo GPU.")
+        elif choice == "3":
+            if opencl.select_device_by_type('CPU'):
+                print("Dispositivo CPU selecionado com sucesso.")
+            else:
+                print("Não foi possível selecionar um dispositivo CPU.")
+        elif choice == "4":
+            print("Mantendo dispositivo atual.")
+        elif choice == "5":
+            opencl.print_device_info()
+        else:
+            print("Opção inválida.")
+    except Exception as e:
+        print(f"Erro na seleção: {e}")
+    
+    print("\nDispositivo atual:", end=" ")
+    current_id = opencl.get_current_device_id()
+    if current_id >= 0:
+        info = opencl.get_device_info()
+        print(f"{info['name']} ({info['type']}) - {info['platform']}")
+    else:
+        print("Nenhum dispositivo OpenCL (usando simulação CPU)")
+    
+    return True
 
 # Verificar suporte OpenCL
 opencl_available, device_info = check_opencl_support()
@@ -54,6 +114,38 @@ def image_blur(input_img, output_img, width, height):
                 sum_value += input_img[(y + j) * width + (x + i)]
 
         output_img[y * width + x] = sum_value / 9.0
+
+# Exemplo 4: Redução (soma de todos os elementos)
+@opencl.jit
+def reduction_sum(input_array, output_array, n):
+    local_id = opencl.get_local_id(0)
+    global_id = opencl.get_global_id(0)
+    group_id = opencl.get_group_id(0)
+    local_size = opencl.get_local_size(0)
+    
+    # Memória compartilhada para redução local
+    shared = opencl.shared_array((local_size,), np.float32)
+    
+    # Carregar dados para memória compartilhada
+    if global_id < n:
+        shared[local_id] = input_array[global_id]
+    else:
+        shared[local_id] = 0.0
+    
+    # Sincronizar threads locais
+    opencl.barrier()
+    
+    # Redução na memória compartilhada
+    stride = local_size // 2
+    while stride > 0:
+        if local_id < stride:
+            shared[local_id] += shared[local_id + stride]
+        opencl.barrier()
+        stride //= 2
+    
+    # Primeiro thread de cada grupo escreve resultado parcial
+    if local_id == 0:
+        output_array[group_id] = shared[0]
 
 def benchmark_vector_add(n=1000000):
     """Benchmarking da soma de vetores"""
@@ -143,6 +235,53 @@ def benchmark_matrix_multiply(width=1024):
         print("✗ Resultados divergem!")
         max_diff = np.max(np.abs(c_mat_numpy - result_mat))
         print(f"Máxima diferença: {max_diff}")
+
+def benchmark_reduction(n=1000000):
+    """Benchmarking da redução (soma)"""
+    print(f"\n=== Benchmark: Redução - Soma ({n} elementos) ===")
+
+    # Criar dados de teste
+    data = np.random.rand(n).astype(np.float32)
+
+    # Resultado usando NumPy
+    start = time.time()
+    sum_numpy = np.sum(data)
+    numpy_time = time.time() - start
+    print(f"NumPy sum: {numpy_time:.6f} segundos, resultado: {sum_numpy}")
+
+    # Transferir para o dispositivo
+    d_data = opencl.to_device(data)
+
+    # Configurar tamanhos
+    block_size = 256
+    grid_size = (n + block_size - 1) // block_size
+    
+    # Alocar array para resultados parciais
+    d_partial_sums = opencl.device_array((grid_size,), dtype=np.float32)
+    
+    # Medir tempo OpenCL
+    start = time.time()
+    
+    # Primeira redução
+    reduction_sum(d_data, d_partial_sums, n, grid=grid_size, block=block_size)
+    
+    # Obter resultados parciais
+    partial_sums = d_partial_sums.copy_to_host()
+    
+    # Somar resultados parciais na CPU
+    sum_opencl = np.sum(partial_sums)
+    opencl_time = time.time() - start
+    
+    print(f"OpenCL reduction: {opencl_time:.6f} segundos, resultado: {sum_opencl}")
+    
+    # Verificar resultado
+    rel_error = abs(sum_numpy - sum_opencl) / abs(sum_numpy)
+    if rel_error < 1e-5:
+        print("✓ Resultados corretos!")
+        print(f"Speedup: {numpy_time/opencl_time:.2f}x")
+    else:
+        print("✗ Resultados divergem!")
+        print(f"Erro relativo: {rel_error}")
 
 def run_examples():
     """Executa exemplos básicos"""
@@ -236,14 +375,111 @@ def run_examples():
 
     print(f"Tempo de execução do filtro: {blur_time:.6f} segundos")
     print("✓ Filtro de imagem aplicado com sucesso")
+    
+    # Exemplo 4: Redução
+    print("\n4. Redução (Soma)")
+    
+    # Criar dados de teste
+    data_size = 1024
+    data = np.random.rand(data_size).astype(np.float32)
+    
+    # Transferir para o dispositivo
+    d_data = opencl.to_device(data)
+    
+    # Configurar tamanhos
+    block_size = 256
+    grid_size = (data_size + block_size - 1) // block_size
+    
+    # Alocar array para resultados parciais
+    d_partial_sums = opencl.device_array((grid_size,), dtype=np.float32)
+    
+    # Executar redução
+    reduction_sum(d_data, d_partial_sums, data_size, grid=grid_size, block=block_size)
+    
+    # Obter resultados parciais
+    partial_sums = d_partial_sums.copy_to_host()
+    
+    # Somar resultados parciais na CPU
+    sum_opencl = np.sum(partial_sums)
+    sum_numpy = np.sum(data)
+    
+    print(f"Soma OpenCL: {sum_opencl}")
+    print(f"Soma NumPy: {sum_numpy}")
+    
+    if abs(sum_opencl - sum_numpy) < 1e-5:
+        print("✓ Teste de redução: SUCESSO")
+    else:
+        print("✗ Teste de redução: FALHA")
+
+def test_streams():
+    """Testa o uso de streams (execução concorrente)"""
+    print("\n=== Teste de Streams (Execução Concorrente) ===")
+    
+    # Criar dados de teste
+    N = 10000
+    a1 = np.random.rand(N).astype(np.float32)
+    b1 = np.random.rand(N).astype(np.float32)
+    c1 = np.zeros_like(a1)
+    
+    a2 = np.random.rand(N).astype(np.float32)
+    b2 = np.random.rand(N).astype(np.float32)
+    c2 = np.zeros_like(a2)
+    
+    # Transferir para o dispositivo
+    d_a1 = opencl.to_device(a1)
+    d_b1 = opencl.to_device(b1)
+    d_c1 = opencl.to_device(c1)
+    
+    d_a2 = opencl.to_device(a2)
+    d_b2 = opencl.to_device(b2)
+    d_c2 = opencl.to_device(c2)
+    
+    # Configurar grid e bloco
+    block_size = 256
+    grid_size = (N + block_size - 1) // block_size
+    
+    # Criar streams
+    stream1 = opencl.stream()
+    stream2 = opencl.stream()
+    
+    # Executar kernels em streams diferentes
+    with stream1:
+        vector_add(d_a1, d_b1, d_c1, grid=grid_size, block=block_size)
+    
+    with stream2:
+        vector_add(d_a2, d_b2, d_c2, grid=grid_size, block=block_size)
+    
+    # Sincronizar
+    stream1.synchronize()
+    stream2.synchronize()
+    
+    # Copiar resultados
+    result1 = d_c1.copy_to_host()
+    result2 = d_c2.copy_to_host()
+    
+    # Verificar resultados
+    expected1 = a1 + b1
+    expected2 = a2 + b2
+    
+    if np.allclose(result1, expected1) and np.allclose(result2, expected2):
+        print("✓ Teste de streams: SUCESSO")
+    else:
+        print("✗ Teste de streams: FALHA")
 
 if __name__ == "__main__":
+    # Mostrar menu para seleção de dispositivo
+    print_device_selection_menu()
+    
     # Executar exemplos
     run_examples()
+    
+    # Testar streams
+    test_streams()
 
     # Executar benchmarks
     benchmark_vector_add(n=5000000)
     benchmark_matrix_multiply(width=512)
+    benchmark_reduction(n=5000000)
 
     print("\nNumba.OpenCL")
     print("Esta é uma implementação protótipo que simula a API do numba.cuda com PyOpenCL")

@@ -1,16 +1,4 @@
 
-from .core import opencl, DeviceArray, SharedMemory
-from .decorators import atomic_add, atomic_max, atomic_min, syncthreads
-
-__all__ = [
-    'opencl',
-    'DeviceArray',
-    'SharedMemory',
-    'atomic_add',
-    'atomic_max',
-    'atomic_min',
-    'syncthreads'
-]
 """
 numba_opencl: Uma extensão para o Numba que permite usar OpenCL como backend.
 
@@ -47,18 +35,96 @@ add(d_a, d_b, d_c, grid=(1,), block=(4,))
 result = d_c.copy_to_host()
 print(result)  # [11, 22, 33, 44]
 ```
+
+Seleção de dispositivo:
+----------------------
+```python
+# Listar todos os dispositivos disponíveis
+devices = opencl.list_devices()
+for device in devices:
+    print(f"{device['id']}: {device['name']} ({device['type']})")
+
+# Selecionar um dispositivo específico pelo ID
+opencl.select_device(1)
+
+# Ou selecionar por tipo
+opencl.select_device_by_type('GPU')  # Ou 'CPU', 'ACCELERATOR'
+```
 """
 
-from .core import opencl, get_global_id
-from .decorators import barrier, atomic_add, local_barrier
+from .core import (
+    opencl, 
+    get_global_id, 
+    get_local_id, 
+    get_group_id, 
+    get_local_size, 
+    get_global_size,
+    barrier,
+    DeviceArray,
+    SharedMemory,
+    Stream,
+    Event
+)
 
-__version__ = '0.1.0'
+from .decorators import (
+    atomic_add, 
+    atomic_max, 
+    atomic_min,
+    atomic_cas,
+    atomic_exch,
+    barrier,
+    local_barrier,
+    syncthreads,
+    mem_fence,
+    workgroup,
+    shfl,
+    CLK_LOCAL_MEM_FENCE,
+    CLK_GLOBAL_MEM_FENCE
+)
+
+from .utils import (
+    check_opencl_support,
+    compare_arrays,
+    format_size
+)
+
+__version__ = '0.2.0'
 
 # Exportar principais componentes
 __all__ = [
-    'opencl',         # Instância principal do módulo
-    'get_global_id',  # Função para obter ID global
-    'barrier',        # Barreira de sincronização
-    'atomic_add',     # Operação atômica de adição
-    'local_barrier',  # Barreira local (similar a __syncthreads() do CUDA)
+    # Core
+    'opencl',           # Instância principal do módulo
+    'get_global_id',    # Função para obter ID global
+    'get_local_id',     # Função para obter ID local
+    'get_group_id',     # Função para obter ID do grupo
+    'get_local_size',   # Função para obter tamanho local
+    'get_global_size',  # Função para obter tamanho global
+    'barrier',          # Barreira de sincronização
+    'DeviceArray',      # Classe para arrays no dispositivo
+    'SharedMemory',     # Classe para memória compartilhada
+    'Stream',           # Classe para streams (filas de comando)
+    'Event',            # Classe para eventos
+    
+    # Decoradores
+    'atomic_add',       # Operação atômica de adição
+    'atomic_max',       # Operação atômica de máximo
+    'atomic_min',       # Operação atômica de mínimo
+    'atomic_cas',       # Operação atômica de comparação e troca
+    'atomic_exch',      # Operação atômica de troca
+    'local_barrier',    # Barreira local (similar a __syncthreads)
+    'syncthreads',      # Alias para local_barrier
+    'mem_fence',        # Barreira de memória
+    'workgroup',        # Classe para operações de grupo de trabalho
+    'shfl',             # Classe para operações de shuffle
+    'CLK_LOCAL_MEM_FENCE',  # Constante para barreira local
+    'CLK_GLOBAL_MEM_FENCE', # Constante para barreira global
+    
+    # Utilidades
+    'check_opencl_support',  # Verificar suporte OpenCL
+    'compare_arrays',       # Comparar arrays com tolerância
+    'format_size',          # Formatar tamanho em bytes
 ]
+
+# Configuração baseada em variáveis de ambiente
+from .utils import set_default_device_from_env
+set_default_device_from_env(opencl)
