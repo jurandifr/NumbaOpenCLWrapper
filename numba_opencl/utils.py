@@ -245,3 +245,39 @@ def get_optimal_work_group_size(device, desired_size):
     except:
         # Fallback para um valor razoável
         return min(desired_size, 256)
+
+def measure_performance(func, args=(), kwargs={}, warmup=1, repeat=3, number=1):
+    """
+    Mede o desempenho de uma função.
+    
+    Args:
+        func: A função para medir o desempenho
+        args: Tupla de argumentos para a função
+        kwargs: Dicionário de argumentos nomeados para a função
+        warmup: Número de execuções de aquecimento (não contabilizadas)
+        repeat: Número de repetições de medição
+        number: Número de chamadas por repetição
+    
+    Returns:
+        dict: Resultados contendo tempos mínimo, máximo, médio e total
+    """
+    # Aquecimento
+    for _ in range(warmup):
+        func(*args, **kwargs)
+    
+    # Medição real
+    times = []
+    for _ in range(repeat):
+        start = time.time()
+        for _ in range(number):
+            func(*args, **kwargs)
+        end = time.time()
+        times.append((end - start) / number)
+    
+    return {
+        'min': min(times),
+        'max': max(times),
+        'avg': sum(times) / len(times),
+        'total': sum(times),
+        'times': times
+    }

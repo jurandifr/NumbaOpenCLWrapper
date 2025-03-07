@@ -597,6 +597,88 @@ class OpenCLExtension:
         print(f"ID: {info['id']}")
         print(f"Nome: {info['name']}")
         print(f"Tipo: {info['type']}")
+
+    def auto_select_best_device(self):
+        """
+        Seleciona automaticamente o melhor dispositivo disponível com base em benchmarks simples.
+        
+        Returns:
+            bool: True se um dispositivo foi selecionado com sucesso, False caso contrário
+        """
+        if not self.opencl_available:
+            print("OpenCL não disponível, usando fallback para CPU (simulação)")
+            return False
+            
+        if not self._available_devices:
+            print("Nenhum dispositivo OpenCL disponível")
+            return False
+            
+        # Se houver apenas um dispositivo, use-o
+        if len(self._available_devices) == 1:
+            self._current_device_id = 0
+            self._setup_current_device()
+            print(f"Selecionado único dispositivo disponível: {self.get_device_info()['name']}")
+            return True
+            
+        print("Testando dispositivos para seleção automática...")
+        best_device = 0
+        best_time = float('inf')
+        
+        # Tamanho do teste
+        n = 1000000
+        test_data = np.random.rand(n).astype(np.float32)
+        
+        for i, (platform, device) in enumerate(self._available_devices):
+            # Configura temporariamente este dispositivo
+            old_device_id = self._current_device_id
+            self._current_device_id = i
+            self._setup_current_device()
+            
+            try:
+                # Executa um teste simples de soma de vetores
+                print(f"Testando dispositivo {i}: {device.name}...", end='', flush=True)
+                start_time = time.time()
+                
+                # Transferência para o dispositivo
+                d_a = self.to_device(test_data)
+                d_b = self.to_device(test_data)
+                d_c = self.device_array_like(test_data)
+                
+                # Executa o kernel simples de soma
+                @self.jit
+                def _test_sum(a, b, c):
+                    idx = get_global_id(0)
+                    if idx < len(c):
+                        c[idx] = a[idx] + b[idx]
+                
+                grid_size = (n + 255) // 256
+                _test_sum(d_a, d_b, d_c, grid=(grid_size,), block=(256,))
+                self.synchronize()
+                
+                # Transferência de volta para o host
+                _ = d_c.copy_to_host()
+                
+                elapsed = time.time() - start_time
+                print(f" {elapsed:.4f}s")
+                
+                if elapsed < best_time:
+                    best_time = elapsed
+                    best_device = i
+                    
+            except Exception as e:
+                print(f" falha: {str(e)}")
+            
+            # Restaura o dispositivo anterior
+            self._current_device_id = old_device_id
+            self._setup_current_device()
+        
+        # Seleciona o melhor dispositivo
+        self._current_device_id = best_device
+        self._setup_current_device()
+        info = self.get_device_info()
+        print(f"\nSelecionado melhor dispositivo: {info['name']} ({info['type']}) com tempo {best_time:.4f}s")
+        return True
+
         print(f"Plataforma: {info['platform']}")
         print(f"Fabricante: {info['vendor']}")
         print(f"Versão OpenCL: {info['version']}")

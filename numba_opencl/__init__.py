@@ -32,6 +32,10 @@ d_c = ocl.to_device(c)
 add(d_a, d_b, d_c, grid=(1,), block=(4,))
 
 # Obter resultado
+
+    'auto_select_best_device',  # Nova função para seleção automática do melhor dispositivo
+    'measure_performance',      # Função para medir desempenho
+
 result = d_c.copy_to_host()
 print(result)  # [11, 22, 33, 44]
 ```

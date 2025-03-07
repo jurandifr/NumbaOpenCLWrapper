@@ -1,22 +1,29 @@
-# Numba.OpenCL
 
-Uma extensão para o Numba que permite usar OpenCL como backend, similar ao módulo `numba.cuda`.
+# 🚀 Numba.OpenCL
 
-## Visão Geral
+> **Você não precisa de uma GPU de última geração para acelerar seus cálculos!** 
+> Transforme qualquer dispositivo compatível com OpenCL em um acelerador para seus algoritmos Python.
 
-O projeto `numba_opencl` é uma extensão que emula a API `numba.cuda` usando PyOpenCL como backend. Isso permite que código existente escrito para GPUs NVIDIA usando `numba.cuda` possa ser facilmente adaptado para execução em uma ampla variedade de dispositivos que suportam OpenCL, incluindo GPUs AMD, Intel, e até mesmo CPUs.
+## 🔍 Visão Geral
 
-## Recursos Principais
+O projeto `numba_opencl` é uma extensão que emula a API `numba.cuda` usando PyOpenCL como backend. Isso permite que código existente escrito para GPUs NVIDIA usando `numba.cuda` possa ser facilmente adaptado para execução em uma ampla variedade de dispositivos que suportam OpenCL, incluindo:
 
-- **API compatível com CUDA**: Use a sintaxe familiar do `numba.cuda` com dispositivos OpenCL
-- **Portabilidade**: Execute em qualquer dispositivo compatível com OpenCL (GPUs AMD, Intel, CPUs, etc.)
-- **Decoradores JIT**: Compile funções Python para kernels OpenCL com o decorador `@opencl.jit`
-- **Gerenciamento de memória**: Transferência de dados entre host e dispositivo, similar ao CUDA
-- **Streams**: Suporte a execução assíncrona através de streams
-- **Profiling**: Ferramentas para análise de desempenho
-- **Funções de sincronização**: Barreiras e operações atômicas
+- 🖥️ GPUs AMD e Intel
+- 💻 CPUs multi-core 
+- 📱 Dispositivos móveis compatíveis
+- 🧠 Aceleradores especializados
 
-## Instalação
+## ✨ Recursos Principais
+
+- 🔄 **API compatível com CUDA**: Use a sintaxe familiar do `numba.cuda` com dispositivos OpenCL
+- 🌐 **Portabilidade Universal**: Execute em qualquer dispositivo compatível com OpenCL
+- 🔧 **Decoradores JIT**: Compile funções Python para kernels OpenCL com o decorador `@ocl.jit`
+- 📊 **Gerenciamento de memória**: Transferência eficiente de dados entre host e dispositivo
+- ⚡ **Streams**: Suporte a execução assíncrona para máximo desempenho
+- 📈 **Profiling**: Ferramentas para análise e otimização de desempenho
+- 🔒 **Funções de sincronização**: Barreiras e operações atômicas para cálculos seguros
+
+## 📦 Instalação
 
 ```bash
 pip install pyopencl numba numpy siphash24 prettytable
@@ -30,7 +37,7 @@ cd numba-opencl
 pip install -e .
 ```
 
-## Estrutura do Projeto
+## 📂 Estrutura do Projeto
 
 ```
 numba_opencl/
@@ -45,7 +52,7 @@ tests.py              # Testes automatizados
 setup.py              # Script de instalação
 ```
 
-## Uso Básico
+## 🚀 Uso Básico
 
 ```python
 import numpy as np
@@ -76,9 +83,9 @@ result = d_c.copy_to_host()
 print(result)  # [11, 22, 33, 44]
 ```
 
-## Exemplos Avançados
+## 🔥 Exemplos Avançados
 
-### Multiplicação de Matrizes
+### 🧮 Multiplicação de Matrizes
 
 ```python
 import numpy as np
@@ -121,7 +128,7 @@ result_flat = d_c.copy_to_host()
 result_mat = result_flat.reshape((width, width))
 ```
 
-### Usando Streams para Execução Assíncrona
+### ⚡ Usando Streams para Execução Assíncrona
 
 ```python
 import numpy as np
@@ -149,7 +156,7 @@ stream1.synchronize()
 stream2.synchronize()
 ```
 
-### Usando o Profiler
+### 📊 Usando o Profiler
 
 ```python
 from numba_opencl.profiler import profiler
@@ -168,7 +175,7 @@ profiler.print_stats()
 profiler.stop()
 ```
 
-## Gestão de Dispositivos
+## 🖥️ Gestão de Dispositivos
 
 ```python
 from numba_opencl import ocl
@@ -189,82 +196,94 @@ info = ocl.get_device_info()
 print(f"Dispositivo atual: {info['name']} ({info['type']})")
 ```
 
-## API
+## 📚 API
 
-### Principais Classes e Funções
+### 🛠️ Principais Classes e Funções
 
-#### Configuração e Inicialização
+#### 🔧 Configuração e Inicialização
 
 - `ocl.list_devices()`: Lista todos os dispositivos OpenCL disponíveis
 - `ocl.select_device(device_id)`: Seleciona um dispositivo pelo ID
 - `ocl.select_device_by_type(device_type)`: Seleciona um dispositivo pelo tipo
 - `ocl.get_device_info(device_id=None)`: Retorna informações do dispositivo
 - `ocl.print_device_info()`: Imprime informações detalhadas do dispositivo atual
+- `ocl.auto_select_best_device()`: Seleciona automaticamente o melhor dispositivo disponível
 
-#### Compilação e Execução
+#### 🚀 Compilação e Execução
 
 - `ocl.jit(func)`: Decorator para compilar uma função Python em um kernel OpenCL
 - `ocl.synchronize()`: Sincroniza todos os comandos pendentes
 - `ocl.device_count()`: Retorna o número de dispositivos OpenCL disponíveis
+- `ocl.compile_program(source)`: Compila um programa OpenCL diretamente do código-fonte
 
-#### Funções de Grid/Thread
+#### 🧵 Funções de Grid/Thread
 
 - `ocl.get_global_id(dim)`: Obtém o ID global da thread atual
 - `ocl.get_local_id(dim)`: Obtém o ID local da thread
 - `ocl.get_group_id(dim)`: Obtém o ID do grupo de trabalho
 - `ocl.get_local_size(dim)`: Obtém o tamanho local do grupo
 - `ocl.get_global_size(dim)`: Obtém o tamanho global
+- `ocl.get_num_groups(dim)`: Obtém o número de grupos de trabalho
 
-#### Gerenciamento de Memória
+#### 💾 Gerenciamento de Memória
 
 - `ocl.to_device(array)`: Transfere um array NumPy para o dispositivo
 - `ocl.device_array(shape, dtype)`: Cria um array vazio no dispositivo
 - `ocl.device_array_like(array)`: Cria um array vazio com a mesma forma e tipo
 - `ocl.shared_array(shape, dtype)`: Cria um array na memória compartilhada
+- `ocl.pinned_array(shape, dtype)`: Cria um array em memória "pinned" para transferências mais rápidas
+- `ocl.managed_array(shape, dtype)`: Cria um array gerenciado (simulado)
 
-#### DeviceArray
+#### 📊 DeviceArray
 
 - `DeviceArray.copy_to_host()`: Copia dados do dispositivo para o host
 - `DeviceArray.copy_to_device(array)`: Copia dados do host para o dispositivo
 - `DeviceArray.copy_from_device(device_array)`: Copia de outro array do dispositivo
 - `DeviceArray.copy_from_device_async(device_array, stream)`: Cópia assíncrona
+- `DeviceArray.zero_copy_view()`: Retorna uma visualização de zero-cópia (quando disponível)
 
-#### Streams
+#### ⚡ Streams
 
 - `ocl.stream()`: Cria um novo stream
 - `stream.synchronize()`: Sincroniza operações no stream
 - `stream.wait_event(event)`: Aguarda um evento
+- `stream.add_callback(callback)`: Adiciona uma função de callback para ser chamada após a conclusão
 
-#### Profiling
+#### 📈 Profiling
 
 - `profiler.start()`: Inicia o profiling
 - `profiler.stop()`: Para o profiling
 - `profiler.get_stats(kernel_name=None)`: Obtém estatísticas de execução
 - `profiler.print_stats()`: Imprime estatísticas formatadas
+- `profiler.export_chrome_trace(filename)`: Exporta dados de perfil no formato Chrome Tracing
+- `profiler.reset()`: Limpa todos os dados de perfil coletados
 
-### Operações Atômicas e Sincronização
+### 🔄 Operações Atômicas e Sincronização
 
 - `atomic_add(array, index, value)`: Adição atômica
 - `atomic_max(array, index, value)`: Máximo atômico
 - `atomic_min(array, index, value)`: Mínimo atômico
 - `atomic_cas(array, index, compare_value, value)`: Compare-and-swap
 - `atomic_exch(array, index, value)`: Troca atômica
+- `atomic_inc(array, index)`: Incremento atômico
+- `atomic_dec(array, index)`: Decremento atômico
 - `barrier()`: Barreira de sincronização global
 - `local_barrier()`: Barreira local dentro de um grupo
 - `syncthreads()`: Alias para local_barrier() (compatibilidade CUDA)
+- `mem_fence(flags)`: Barreira de memória com flags específicas
 
-## Exemplos Incluídos
+## 🧪 Exemplos Incluídos
 
 O arquivo `main.py` contém vários exemplos:
 
-1. **Soma de Vetores**: Operação básica de elemento a elemento
-2. **Multiplicação de Matrizes**: Demonstração de kernel 2D
-3. **Filtro de Imagem**: Exemplo de processamento de imagem (blur)
-4. **Redução**: Soma de todos os elementos de um array
-5. **SAXPY**: Operação Single-Precision A*X Plus Y
-6. **Convolução 2D**: Aplicação de filtro Sobel para detecção de bordas
+1. **🔢 Soma de Vetores**: Operação básica de elemento a elemento
+2. **🧮 Multiplicação de Matrizes**: Demonstração de kernel 2D
+3. **🖼️ Filtro de Imagem**: Exemplo de processamento de imagem (blur)
+4. **📊 Redução**: Soma de todos os elementos de um array
+5. **📈 SAXPY**: Operação Single-Precision A*X Plus Y
+6. **🔍 Convolução 2D**: Aplicação de filtro Sobel para detecção de bordas
 
-## Benchmarks
+## ⚡ Benchmarks
 
 O projeto inclui benchmarks que comparam o desempenho do OpenCL versus NumPy puro:
 
@@ -273,13 +292,13 @@ python main.py --bench
 ```
 
 Os benchmarks incluem:
-- Soma de vetores
-- Multiplicação de matrizes
-- Redução (soma)
-- SAXPY
-- Convolução 2D
+- 🔢 Soma de vetores
+- 🧮 Multiplicação de matrizes
+- 📊 Redução (soma)
+- 📈 SAXPY
+- 🔍 Convolução 2D
 
-## Testes
+## 🧪 Testes
 
 O arquivo `tests.py` contém testes automatizados:
 
@@ -287,7 +306,7 @@ O arquivo `tests.py` contém testes automatizados:
 python tests.py
 ```
 
-## Compatibilidade
+## 🔄 Compatibilidade
 
 Esta biblioteca foi testada com:
 - Python 3.6+
@@ -296,12 +315,12 @@ Esta biblioteca foi testada com:
 - Numba 0.55+
 
 Dispositivos testados:
-- GPUs NVIDIA (versões de driver 470+)
-- GPUs AMD (drivers ROCm e proprietários)
-- GPUs Intel
-- CPUs Intel/AMD via OpenCL
+- 🟢 GPUs NVIDIA (versões de driver 470+)
+- 🔴 GPUs AMD (drivers ROCm e proprietários)
+- 🔵 GPUs Intel
+- 💻 CPUs Intel/AMD via OpenCL
 
-## Limitações
+## ⚠️ Limitações
 
 - Esta é uma implementação de prova de conceito
 - Não é uma integração completa com o compilador Numba
@@ -310,10 +329,18 @@ Dispositivos testados:
 - Sem suporte para CUDA Unified Memory
 - Alguns padrões de programação CUDA avançados não são suportados
 
-## Contribuições
+## 💡 Por que usar numba_opencl?
+
+- 🚫 **Não exige hardware NVIDIA**: Utilize o hardware que você já possui
+- 💰 **Economia**: Evite o custo de GPUs dedicadas caras
+- 🔄 **Código portável**: Escreva uma vez, execute em qualquer lugar
+- 🧠 **Aproveite a CPU**: Mesmo sem GPU, acelere seu código usando todos os núcleos da CPU
+- 🌱 **Aprendizado simplificado**: Use a sintaxe familiar do CUDA com seu hardware atual
+
+## 👥 Contribuições
 
 Contribuições são bem-vindas! Por favor, abra um issue ou envie um pull request.
 
-## Licença
+## 📄 Licença
 
 MIT
