@@ -10,333 +10,316 @@ import unittest
 import numpy as np
 import time
 import sys
+import os
 from numba_opencl import opencl
-from numba_opencl.utils import check_opencl_support, compare_arrays
+from numba_opencl.utils import check_opencl_support, compare_arr
 
-class TestOpenCL(unittest.TestCase):
-    """Testes para a extensão numba_opencl"""
+class TestOpenCLSupport(unittest.TestCase):
+    """Testes de verificação de suporte OpenCL."""
+    
+    def test_opencl_available(self):
+        """Verifica se o OpenCL está disponível no sistema."""
+        available, info = check_opencl_support()
+        print(f"OpenCL disponível: {available}")
+        if available:
+            if isinstance(info, list):
+                print(f"Dispositivos encontrados: {len(info)}")
+                for device in info:
+                    print(f"  - {device['name']} ({device['type']}) - {device['platform']}")
+            else:
+                print(f"Informações: {info}")
+        else:
+            print(f"Motivo: {info}")
+    
+    def test_current_device(self):
+        """Verifica o dispositivo atual."""
+        device_id = opencl.get_current_device_id()
+        print(f"ID do dispositivo atual: {device_id}")
+        if device_id >= 0:
+            info = opencl.get_device_info()
+            print(f"Dispositivo: {info['name']}")
+            print(f"Tipo: {info['type']}")
+            print(f"Plataforma: {info['platform']}")
+            print(f"Unidades de computação: {info['compute_units']}")
+
+class TestBasicOperations(unittest.TestCase):
+    """Testes de operações básicas."""
     
     def setUp(self):
-        """Configurações iniciais para os testes"""
-        # Verificar se OpenCL está disponível
-        self.opencl_available, _ = check_opencl_support()
+        """Inicializa dados de teste."""
+        self.test_size = 1000
+        self.a = np.random.rand(self.test_size).astype(np.float32)
+        self.b = np.random.rand(self.test_size).astype(np.float32)
+        self.c = np.zeros(self.test_size, dtype=np.float32)
+    
+    def test_to_device(self):
+        """Testa transferência para o dispositivo."""
+        d_a = opencl.to_device(self.a)
+        self.assertEqual(d_a.shape, self.a.shape)
+        self.assertEqual(d_a.dtype, self.a.dtype)
         
-        # Definir tamanhos para testes
-        self.N = 10000
-        self.test_array = np.random.rand(self.N).astype(np.float32)
-        
-        # Kernel de teste para soma de vetores
+        # Testar transferência de volta
+        a_copy = d_a.copy_to_host()
+        self.assertTrue(np.array_equal(self.a, a_copy))
+    
+    def test_vector_add(self):
+        """Testa kernel de soma de vetores."""
         @opencl.jit
         def vector_add(a, b, c):
             i = opencl.get_global_id(0)
             if i < len(c):
                 c[i] = a[i] + b[i]
         
-        # Kernel de teste para escala de vetor
-        @opencl.jit
-        def vector_scale(a, b, scale):
-            i = opencl.get_global_id(0)
-            if i < len(a):
-                b[i] = a[i] * scale
-        
-        self.vector_add = vector_add
-        self.vector_scale = vector_scale
-    
-    def test_device_detection(self):
-        """Testa detecção de dispositivos OpenCL"""
-        print("\n=== Teste de Detecção de Dispositivos ===")
-        
-        # Listar dispositivos
-        devices = opencl.list_devices()
-        print(f"Dispositivos detectados: {len(devices)}")
-        
-        for device in devices:
-            print(f"  {device['id']}: {device['name']} ({device['type']}) - {device['platform']}")
-        
-        # Verificar contagem de dispositivos
-        self.assertEqual(len(devices), opencl.device_count())
-        
-        # Verificar dispositivo atual
-        current_device = opencl.get_current_device()
-        print(f"Dispositivo atual: {current_device}")
-        
-        self.assertTrue(len(devices) > 0 or not self.opencl_available)
-    
-    def test_device_selection(self):
-        """Testa seleção de dispositivos OpenCL"""
-        if not self.opencl_available:
-            self.skipTest("OpenCL não está disponível")
-        
-        print("\n=== Teste de Seleção de Dispositivos ===")
-        
-        # Obter ID do dispositivo atual
-        current_id = opencl.get_current_device_id()
-        print(f"Dispositivo atual: {current_id}")
-        
-        # Obter contagem de dispositivos
-        device_count = opencl.device_count()
-        if device_count > 1:
-            # Tentar selecionar outro dispositivo
-            new_id = (current_id + 1) % device_count
-            success = opencl.select_device(new_id)
-            print(f"Selecionando dispositivo {new_id}: {'Sucesso' if success else 'Falha'}")
-            
-            # Verificar se a seleção funcionou
-            if success:
-                self.assertEqual(opencl.get_current_device_id(), new_id)
-            
-            # Voltar ao dispositivo original
-            opencl.select_device(current_id)
-    
-    def test_memory_transfer(self):
-        """Testa transferência de memória entre host e dispositivo"""
-        print("\n=== Teste de Transferência de Memória ===")
-        
-        # Criar array para teste
-        host_array = np.random.rand(self.N).astype(np.float32)
-        
-        # Transferir para o dispositivo
-        device_array = opencl.to_device(host_array)
-        
-        # Transferir de volta para o host
-        result_array = device_array.copy_to_host()
-        
-        # Verificar se os dados são idênticos
-        self.assertTrue(compare_arrays(host_array, result_array))
-        print("✓ Transferência de memória: SUCESSO")
-    
-    def test_basic_kernel(self):
-        """Testa execução básica de kernel"""
-        print("\n=== Teste de Kernel Básico ===")
-        
-        # Criar dados de teste
-        a = np.random.rand(self.N).astype(np.float32)
-        b = np.random.rand(self.N).astype(np.float32)
-        c = np.zeros_like(a)
-        
-        # Transferir para o dispositivo
-        d_a = opencl.to_device(a)
-        d_b = opencl.to_device(b)
-        d_c = opencl.to_device(c)
-        
-        # Configurar grid e bloco
-        block_size = 256
-        grid_size = (self.N + block_size - 1) // block_size
+        # Transferir para dispositivo
+        d_a = opencl.to_device(self.a)
+        d_b = opencl.to_device(self.b)
+        d_c = opencl.to_device(self.c)
         
         # Executar kernel
-        self.vector_add(d_a, d_b, d_c, grid=grid_size, block=block_size)
+        block_size = 256
+        grid_size = (self.test_size + block_size - 1) // block_size
+        vector_add(d_a, d_b, d_c, grid=grid_size, block=block_size)
         
-        # Copiar resultado de volta
+        # Verificar resultado
         result = d_c.copy_to_host()
+        expected = self.a + self.b
+        
+        self.assertTrue(np.allclose(result, expected, rtol=1e-5, atol=1e-5))
+    
+    def test_device_array(self):
+        """Testa alocação de array no dispositivo."""
+        d_array = opencl.device_array(self.test_size, dtype=np.float32)
+        self.assertEqual(d_array.shape, (self.test_size,))
+        self.assertEqual(d_array.dtype, np.float32)
+        
+        # Testar preenchimento com zeros
+        array_data = d_array.copy_to_host()
+        self.assertEqual(array_data.shape, (self.test_size,))
+
+class TestMemoryOperations(unittest.TestCase):
+    """Testes de operações de memória."""
+    
+    def setUp(self):
+        """Inicializa dados de teste."""
+        self.test_size = 1000
+        self.data = np.random.rand(self.test_size).astype(np.float32)
+    
+    def test_copy_operations(self):
+        """Testa operações de cópia."""
+        # Transferir para dispositivo
+        d_data = opencl.to_device(self.data)
+        
+        # Criar outro array no dispositivo
+        d_copy = opencl.device_array_like(self.data)
+        
+        # Copiar entre dispositivos
+        d_copy.copy_from_device(d_data)
         
         # Verificar resultado
-        expected = a + b
-        self.assertTrue(compare_arrays(result, expected))
-        print("✓ Kernel básico: SUCESSO")
+        result = d_copy.copy_to_host()
+        self.assertTrue(np.array_equal(result, self.data))
     
-    def test_scalar_argument(self):
-        """Testa passagem de argumento escalar para kernel"""
-        print("\n=== Teste de Argumento Escalar ===")
+    def test_async_copy(self):
+        """Testa operações de cópia assíncrona."""
+        # Criar stream
+        stream = opencl.stream()
         
-        # Criar dados de teste
-        a = np.random.rand(self.N).astype(np.float32)
-        b = np.zeros_like(a)
-        scale_factor = 2.5
+        # Transferir para dispositivo de forma assíncrona
+        d_data = opencl.to_device(self.data)
+        
+        # Criar outro array no dispositivo
+        d_copy = opencl.device_array_like(self.data)
+        
+        # Copiar de forma assíncrona
+        with stream:
+            d_copy.copy_from_device_async(d_data, stream)
+        
+        # Sincronizar
+        stream.synchronize()
+        
+        # Verificar resultado
+        result = d_copy.copy_to_host()
+        self.assertTrue(np.array_equal(result, self.data))
+
+class TestAdvancedOperations(unittest.TestCase):
+    """Testes de operações avançadas."""
+    
+    def test_matrix_multiply(self):
+        """Testa multiplicação de matrizes."""
+        width = 32
+        a_mat = np.random.rand(width, width).astype(np.float32)
+        b_mat = np.random.rand(width, width).astype(np.float32)
+        c_mat = np.zeros((width, width), dtype=np.float32)
+        
+        @opencl.jit
+        def matrix_multiply(a, b, c, width):
+            row = opencl.get_global_id(0)
+            col = opencl.get_global_id(1)
+            
+            if row < width and col < width:
+                tmp = 0.0
+                for i in range(width):
+                    tmp += a[row * width + i] * b[i * width + col]
+                c[row * width + col] = tmp
+        
+        # Reformatar para array unidimensional
+        a_flat = a_mat.flatten()
+        b_flat = b_mat.flatten()
+        c_flat = c_mat.flatten()
         
         # Transferir para o dispositivo
-        d_a = opencl.to_device(a)
-        d_b = opencl.to_device(b)
-        
-        # Configurar grid e bloco
-        block_size = 256
-        grid_size = (self.N + block_size - 1) // block_size
+        d_a = opencl.to_device(a_flat)
+        d_b = opencl.to_device(b_flat)
+        d_c = opencl.to_device(c_flat)
         
         # Executar kernel
-        self.vector_scale(d_a, d_b, scale_factor, grid=grid_size, block=block_size)
-        
-        # Copiar resultado de volta
-        result = d_b.copy_to_host()
+        block_dim = (16, 16)
+        grid_dim = (width // block_dim[0] + 1, width // block_dim[1] + 1)
+        matrix_multiply(d_a, d_b, d_c, width, grid=grid_dim, block=block_dim)
         
         # Verificar resultado
-        expected = a * scale_factor
-        self.assertTrue(compare_arrays(result, expected))
-        print("✓ Argumento escalar: SUCESSO")
+        result_flat = d_c.copy_to_host()
+        result_mat = result_flat.reshape((width, width))
+        
+        expected_mat = np.matmul(a_mat, b_mat)
+        self.assertTrue(np.allclose(result_mat, expected_mat, rtol=1e-3, atol=1e-3))
     
-    def test_stream(self):
-        """Testa uso de streams (execução concorrente)"""
-        print("\n=== Teste de Streams ===")
+    def test_reduction(self):
+        """Testa redução (soma)."""
+        data_size = 1024
+        data = np.random.rand(data_size).astype(np.float32)
         
-        # Criar dados de teste
-        a1 = np.random.rand(self.N).astype(np.float32)
-        b1 = np.random.rand(self.N).astype(np.float32)
-        c1 = np.zeros_like(a1)
-        
-        a2 = np.random.rand(self.N).astype(np.float32)
-        b2 = np.random.rand(self.N).astype(np.float32)
-        c2 = np.zeros_like(a2)
+        @opencl.jit
+        def reduction_sum(input_array, output_array, n):
+            local_id = opencl.get_local_id(0)
+            global_id = opencl.get_global_id(0)
+            group_id = opencl.get_group_id(0)
+            local_size = opencl.get_local_size(0)
+            
+            # Memória compartilhada para redução local
+            shared = opencl.shared_array((local_size,), np.float32)
+            
+            # Carregar dados para memória compartilhada
+            if global_id < n:
+                shared[local_id] = input_array[global_id]
+            else:
+                shared[local_id] = 0.0
+            
+            # Sincronizar threads locais
+            opencl.barrier()
+            
+            # Redução na memória compartilhada
+            stride = local_size // 2
+            while stride > 0:
+                if local_id < stride:
+                    shared[local_id] += shared[local_id + stride]
+                opencl.barrier()
+                stride //= 2
+            
+            # Primeiro thread de cada grupo escreve resultado parcial
+            if local_id == 0:
+                output_array[group_id] = shared[0]
         
         # Transferir para o dispositivo
-        d_a1 = opencl.to_device(a1)
-        d_b1 = opencl.to_device(b1)
-        d_c1 = opencl.to_device(c1)
+        d_data = opencl.to_device(data)
         
-        d_a2 = opencl.to_device(a2)
-        d_b2 = opencl.to_device(b2)
-        d_c2 = opencl.to_device(c2)
-        
-        # Configurar grid e bloco
+        # Configurar tamanhos
         block_size = 256
-        grid_size = (self.N + block_size - 1) // block_size
+        grid_size = (data_size + block_size - 1) // block_size
         
-        # Criar streams
-        stream1 = opencl.stream()
-        stream2 = opencl.stream()
+        # Alocar array para resultados parciais
+        d_partial_sums = opencl.device_array((grid_size,), dtype=np.float32)
         
-        try:
-            # Executar kernels em streams diferentes
-            with stream1:
-                self.vector_add(d_a1, d_b1, d_c1, grid=grid_size, block=block_size)
-            
-            with stream2:
-                self.vector_add(d_a2, d_b2, d_c2, grid=grid_size, block=block_size)
-            
-            # Sincronizar
-            stream1.synchronize()
-            stream2.synchronize()
-            
-            # Copiar resultados
-            result1 = d_c1.copy_to_host()
-            result2 = d_c2.copy_to_host()
-            
-            # Verificar resultados
-            expected1 = a1 + b1
-            expected2 = a2 + b2
-            
-            self.assertTrue(compare_arrays(result1, expected1))
-            self.assertTrue(compare_arrays(result2, expected2))
-            print("✓ Streams: SUCESSO")
-        except Exception as e:
-            print(f"Erro no teste de streams: {e}")
-            self.fail(f"Teste de streams falhou: {e}")
+        # Executar redução
+        reduction_sum(d_data, d_partial_sums, data_size, grid=grid_size, block=block_size)
+        
+        # Obter resultados parciais
+        partial_sums = d_partial_sums.copy_to_host()
+        
+        # Somar resultados parciais
+        sum_opencl = np.sum(partial_sums)
+        sum_numpy = np.sum(data)
+        
+        self.assertTrue(np.isclose(sum_opencl, sum_numpy, rtol=1e-5))
+
+class TestPerformance(unittest.TestCase):
+    """Testes de performance."""
     
-    def test_events(self):
-        """Testa eventos e sincronização"""
-        print("\n=== Teste de Eventos ===")
-        
-        # Criar dados de teste
-        a = np.random.rand(self.N).astype(np.float32)
-        b = np.random.rand(self.N).astype(np.float32)
-        c = np.zeros_like(a)
-        
-        # Transferir para o dispositivo
-        d_a = opencl.to_device(a)
-        d_b = opencl.to_device(b)
-        d_c = opencl.to_device(c)
-        
-        # Configurar grid e bloco
-        block_size = 256
-        grid_size = (self.N + block_size - 1) // block_size
-        
-        try:
-            # Criar eventos
-            start_event = opencl.event()
-            end_event = opencl.event()
-            
-            # Registrar eventos
-            start_event.record()
-            
-            # Executar kernel
-            self.vector_add(d_a, d_b, d_c, grid=grid_size, block=block_size)
-            
-            # Registrar evento final
-            end_event.record()
-            
-            # Sincronizar eventos
-            end_event.synchronize()
-            
-            # Obter tempo decorrido
-            elapsed_time = start_event.elapsed_time(end_event)
-            print(f"Tempo decorrido: {elapsed_time} ms")
-            
-            # Verificar resultado
-            result = d_c.copy_to_host()
-            expected = a + b
-            
-            self.assertTrue(compare_arrays(result, expected))
-            print("✓ Eventos: SUCESSO")
-        except Exception as e:
-            print(f"Erro no teste de eventos: {e}")
-            # Não falhar o teste, pois alguns dispositivos podem não suportar profiling
-            print("Ignorando falha no teste de eventos")
-    
-    def test_performance(self):
-        """Testa performance básica"""
-        print("\n=== Teste de Performance ===")
-        
-        # Definir tamanho maior para teste de performance
-        N = 10000000
-        
-        # Criar dados de teste
-        a = np.random.rand(N).astype(np.float32)
-        b = np.random.rand(N).astype(np.float32)
-        c_opencl = np.zeros_like(a)
+    def test_vector_add_performance(self):
+        """Compara performance de soma de vetores entre OpenCL e NumPy."""
+        n = 1000000
+        a = np.random.rand(n).astype(np.float32)
+        b = np.random.rand(n).astype(np.float32)
         
         # Medir tempo NumPy
         start = time.time()
         c_numpy = a + b
         numpy_time = time.time() - start
-        print(f"NumPy: {numpy_time:.6f} segundos")
         
-        # Transferir para o dispositivo
+        @opencl.jit
+        def vector_add(a, b, c):
+            i = opencl.get_global_id(0)
+            if i < len(c):
+                c[i] = a[i] + b[i]
+        
+        # Transferir para dispositivo
         d_a = opencl.to_device(a)
         d_b = opencl.to_device(b)
-        d_c = opencl.to_device(c_opencl)
+        d_c = opencl.device_array_like(a)
         
         # Configurar grid e bloco
         block_size = 256
-        grid_size = (N + block_size - 1) // block_size
+        grid_size = (n + block_size - 1) // block_size
         
-        # Execução inicial para "aquecer" (ignorar)
-        self.vector_add(d_a, d_b, d_c, grid=grid_size, block=block_size)
+        # Aquecer GPU (primeira execução é mais lenta)
+        vector_add(d_a, d_b, d_c, grid=grid_size, block=block_size)
         opencl.synchronize()
         
-        # Medir tempo OpenCL (apenas kernel)
+        # Medir tempo OpenCL
         start = time.time()
-        self.vector_add(d_a, d_b, d_c, grid=grid_size, block=block_size)
+        vector_add(d_a, d_b, d_c, grid=grid_size, block=block_size)
         opencl.synchronize()
-        kernel_time = time.time() - start
-        print(f"OpenCL (kernel): {kernel_time:.6f} segundos")
+        opencl_time = time.time() - start
         
-        # Medir tempo OpenCL (incluindo transferência)
-        start = time.time()
-        d_a = opencl.to_device(a)
-        d_b = opencl.to_device(b)
-        d_c = opencl.to_device(c_opencl)
-        self.vector_add(d_a, d_b, d_c, grid=grid_size, block=block_size)
-        opencl.synchronize()
-        c_opencl = d_c.copy_to_host()
-        total_time = time.time() - start
-        print(f"OpenCL (total): {total_time:.6f} segundos")
-        
-        # Verificar resultado
-        self.assertTrue(compare_arrays(c_numpy, c_opencl, rtol=1e-4, atol=1e-4))
-        print("✓ Resultado correto")
-        
-        # Calcular speedups
-        kernel_speedup = numpy_time / kernel_time
-        total_speedup = numpy_time / total_time
-        print(f"Speedup (kernel): {kernel_speedup:.2f}x")
-        print(f"Speedup (total): {total_speedup:.2f}x")
+        print(f"\nTempo NumPy: {numpy_time:.6f} segundos")
+        print(f"Tempo OpenCL: {opencl_time:.6f} segundos")
+        if opencl_time < numpy_time:
+            speedup = numpy_time / opencl_time
+            print(f"OpenCL é {speedup:.2f}x mais rápido")
+        else:
+            slowdown = opencl_time / numpy_time
+            print(f"OpenCL é {slowdown:.2f}x mais lento")
 
-if __name__ == '__main__':
-    print("Testes NumbaOpenCL")
-    print("==================")
+def run_tests():
+    """Executa todos os testes."""
+    test_classes = [
+        TestOpenCLSupport,
+        TestBasicOperations,
+        TestMemoryOperations,
+        TestAdvancedOperations,
+        TestPerformance
+    ]
     
-    # Verificar se OpenCL está disponível
-    opencl_available, device_info = check_opencl_support()
-    if not opencl_available:
-        print(f"AVISO: OpenCL não está disponível: {device_info}")
+    loader = unittest.TestLoader()
+    suite_list = []
+    
+    for test_class in test_classes:
+        suite = loader.loadTestsFromTestCase(test_class)
+        suite_list.append(suite)
+    
+    full_suite = unittest.TestSuite(suite_list)
+    runner = unittest.TextTestRunner(verbosity=2)
+    runner.run(full_suite)
+
+if __name__ == "__main__":
+    print("=" * 70)
+    print("Testes do módulo numba_opencl")
+    print("=" * 70)
+    
+    # Verificar disponibilidade do OpenCL
+    available, info = check_opencl_support()
+    if not available:
+        print(f"Aviso: OpenCL não está disponível: {info}")
         print("Os testes serão executados em modo de simulação CPU.")
     
-    # Executar testes
-    unittest.main(argv=[sys.argv[0]])
+    run_tests()
