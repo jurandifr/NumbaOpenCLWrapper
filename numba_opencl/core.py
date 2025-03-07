@@ -424,5 +424,16 @@ class SharedMemory:
         self.data[key] = value
 
 
+# Funções auxiliares do OpenCL
+def get_global_id(dim):
+    """Emula a função get_global_id do OpenCL"""
+    import pyopencl as cl
+    try:
+        return cl.get_global_id(dim)
+    except:
+        return 0  # Fallback
+
 # Criar instância global do módulo opencl
 opencl = OpenCLExtension()
+# Adicionar get_global_id como método do opencl
+opencl.get_global_id = get_global_id
