@@ -1,6 +1,24 @@
 import numpy as np
 import time
 from numba_opencl import opencl
+from numba_opencl.utils import check_opencl_support
+
+# Verificar suporte OpenCL
+opencl_available, device_info = check_opencl_support()
+if opencl_available:
+    if isinstance(device_info, list):
+        print("=== Dispositivos OpenCL disponíveis ===")
+        for i, device in enumerate(device_info):
+            print(f"Dispositivo {i}: {device['name']} ({device['type']})")
+            print(f"  Plataforma: {device['platform']}")
+            print(f"  Versão: {device['version']}")
+            print(f"  Unidades de computação: {device['max_compute_units']}")
+            print(f"  Tamanho máximo do grupo: {device['max_work_group_size']}")
+    else:
+        print(f"OpenCL disponível, mas não foi possível listar dispositivos: {device_info}")
+else:
+    print(f"Aviso: OpenCL não está disponível: {device_info}")
+    print("O código será executado em modo de simulação CPU.")
 
 # Exemplo 1: Soma de vetores
 @opencl.jit

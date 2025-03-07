@@ -1,0 +1,5 @@
+
+pyopencl>=2025.1
+numba>=0.60.0
+numpy>=2.0.0
+siphash24>=1.7

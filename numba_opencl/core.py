@@ -23,6 +23,31 @@ class OpenCLExtension:
     """
     def __init__(self):
         # Inicialização básica do contexto OpenCL
+        from .utils import check_opencl_support
+        
+        # Variáveis para fallback
+        self._local_size = 64  # Tamanho padrão do grupo local
+        self._stream = None
+        self._thread_local = threading.local()
+        self._program_cache = {}
+        
+        # Verificar suporte OpenCL
+        opencl_available, device_info = check_opencl_support()
+        
+        if not opencl_available:
+            print(f"OpenCL não disponível: {device_info}")
+            # Fallback para CPU (simulação)
+            self.platforms = []
+            self.devices = []
+            self.device = None
+            self.context = None
+            self.queue = None
+            self.max_work_group_size = 256
+            self.max_work_item_dimensions = 3
+            self.max_work_item_sizes = (256, 256, 256)
+            print("Usando fallback para CPU (simulação)")
+            return
+            
         try:
             self.platforms = cl.get_platforms()
             if not self.platforms:
@@ -35,12 +60,6 @@ class OpenCLExtension:
             self.device = self.devices[0]
             self.context = cl.Context([self.device])
             self.queue = cl.CommandQueue(self.context)
-            self._local_size = 64  # Tamanho padrão do grupo local
-            self._stream = None
-            self._thread_local = threading.local()
-            
-            # Cache para programas OpenCL compilados
-            self._program_cache = {}
             
             # Informações do dispositivo
             self.max_work_group_size = self.device.get_info(cl.device_info.MAX_WORK_GROUP_SIZE)
@@ -48,9 +67,12 @@ class OpenCLExtension:
             self.max_work_item_sizes = self.device.get_info(cl.device_info.MAX_WORK_ITEM_SIZES)
             
             print(f"OpenCL Inicializado: {self.device.name}")
-            print(f"Max Group Size: {self.max_work_group_size}")
-            print(f"Max Work Item Dimensions: {self.max_work_item_dimensions}")
-            print(f"Max Work Item Sizes: {self.max_work_item_sizes}")
+            print(f"Tipo do dispositivo: {cl.device_type.to_string(self.device.get_info(cl.device_info.TYPE))}")
+            print(f"Versão OpenCL: {self.device.get_info(cl.device_info.VERSION)}")
+            print(f"Unidades de computação: {self.device.get_info(cl.device_info.MAX_COMPUTE_UNITS)}")
+            print(f"Tamanho máximo do grupo de trabalho: {self.max_work_group_size}")
+            print(f"Dimensões máximas: {self.max_work_item_dimensions}")
+            print(f"Tamanhos máximos de item: {self.max_work_item_sizes}")
             
         except Exception as e:
             print(f"Erro ao inicializar OpenCL: {e}")
@@ -58,7 +80,10 @@ class OpenCLExtension:
             self.device = None
             self.context = None
             self.queue = None
-            print("Usando fallback para CPU")
+            self.max_work_group_size = 256
+            self.max_work_item_dimensions = 3
+            self.max_work_item_sizes = (256, 256, 256)
+            print("Usando fallback para CPU (simulação)")
 
     @property
     def local_size(self):
@@ -361,16 +386,24 @@ class DeviceArray:
     def copy_to_host(self):
         """Copia dados do dispositivo para o host"""
         if self.cl_buffer is None:
-            return None
+            print("Aviso: Buffer OpenCL é None, retornando array vazio")
+            return np.empty(self.shape, dtype=self.dtype)
             
         try:
             result = np.empty(self.shape, dtype=self.dtype)
             cl.enqueue_copy(self.opencl_ext.queue, result, self.cl_buffer)
             self.opencl_ext.queue.finish()  # Garantir que a cópia seja concluída
             return result
+        except cl.LogicError as e:
+            print(f"Erro lógico do OpenCL ao copiar para o host: {e}")
+            print("Isto pode ocorrer se o buffer foi invalidado ou o contexto foi perdido")
+            return np.empty(self.shape, dtype=self.dtype)
+        except cl.RuntimeError as e:
+            print(f"Erro de runtime do OpenCL ao copiar para o host: {e}")
+            return np.empty(self.shape, dtype=self.dtype)
         except Exception as e:
-            print(f"Erro ao copiar para o host: {e}")
-            return None
+            print(f"Erro genérico ao copiar para o host: {e}")
+            return np.empty(self.shape, dtype=self.dtype)
     
     def copy_to_device(self, arr):
         """Copia dados do host para o dispositivo"""
