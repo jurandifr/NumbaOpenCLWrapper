@@ -10,11 +10,11 @@ Exemplo básico:
 ---------------
 ```python
 import numpy as np
-from numba_opencl import opencl
+from numba_opencl import ocl
 
-@opencl.jit
+@ocl.jit
 def add(a, b, c):
-    i = opencl.get_global_id(0)
+    i = ocl.get_global_id(0)
     if i < len(c):
         c[i] = a[i] + b[i]
 
@@ -24,9 +24,9 @@ b = np.array([10, 20, 30, 40], dtype=np.float32)
 c = np.zeros_like(a)
 
 # Transferir para GPU
-d_a = opencl.to_device(a)
-d_b = opencl.to_device(b)
-d_c = opencl.to_device(c)
+d_a = ocl.to_device(a)
+d_b = ocl.to_device(b)
+d_c = ocl.to_device(c)
 
 # Executar kernel
 add(d_a, d_b, d_c, grid=(1,), block=(4,))
@@ -40,20 +40,20 @@ Seleção de dispositivo:
 ----------------------
 ```python
 # Listar todos os dispositivos disponíveis
-devices = opencl.list_devices()
+devices = ocl.list_devices()
 for device in devices:
     print(f"{device['id']}: {device['name']} ({device['type']})")
 
 # Selecionar um dispositivo específico pelo ID
-opencl.select_device(1)
+ocl.select_device(1)
 
 # Ou selecionar por tipo
-opencl.select_device_by_type('GPU')  # Ou 'CPU', 'ACCELERATOR'
+ocl.select_device_by_type('GPU')  # Ou 'CPU', 'ACCELERATOR'
 ```
 """
 
 from .core import (
-    opencl, 
+    opencl as ocl, 
     get_global_id, 
     get_local_id, 
     get_group_id, 
@@ -93,7 +93,7 @@ __version__ = '0.2.0'
 # Exportar principais componentes
 __all__ = [
     # Core
-    'opencl',           # Instância principal do módulo
+    'ocl',              # Instância principal do módulo
     'get_global_id',    # Função para obter ID global
     'get_local_id',     # Função para obter ID local
     'get_group_id',     # Função para obter ID do grupo
@@ -127,4 +127,4 @@ __all__ = [
 
 # Configuração baseada em variáveis de ambiente
 from .utils import set_default_device_from_env
-set_default_device_from_env(opencl)
+set_default_device_from_env(ocl)

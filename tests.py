@@ -11,7 +11,7 @@ import numpy as np
 import time
 import sys
 import os
-from numba_opencl import opencl
+from numba_opencl import ocl
 from numba_opencl.utils import check_opencl_support, compare_arr
 
 class TestOpenCLSupport(unittest.TestCase):

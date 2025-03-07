@@ -1,4 +1,3 @@
-
 # Numba.OpenCL
 
 Uma extensão para o Numba que permite usar OpenCL como backend, similar ao módulo `numba.cuda`.
@@ -50,12 +49,12 @@ setup.py              # Script de instalação
 
 ```python
 import numpy as np
-from numba_opencl import opencl
+from numba_opencl import ocl
 
 # Definir um kernel OpenCL
-@opencl.jit
+@ocl.jit
 def vector_add(a, b, c):
-    i = opencl.get_global_id(0)
+    i = ocl.get_global_id(0)
     if i < len(c):
         c[i] = a[i] + b[i]
 
@@ -65,9 +64,9 @@ b = np.array([10, 20, 30, 40], dtype=np.float32)
 c = np.zeros_like(a)
 
 # Transferir para o dispositivo
-d_a = opencl.to_device(a)
-d_b = opencl.to_device(b)
-d_c = opencl.to_device(c)
+d_a = ocl.to_device(a)
+d_b = ocl.to_device(b)
+d_c = ocl.to_device(c)
 
 # Executar kernel (similar ao CUDA)
 vector_add(d_a, d_b, d_c, grid=(1,), block=(4,))
@@ -83,12 +82,12 @@ print(result)  # [11, 22, 33, 44]
 
 ```python
 import numpy as np
-from numba_opencl import opencl
+from numba_opencl import ocl
 
-@opencl.jit
+@ocl.jit
 def matrix_multiply(a, b, c, width):
-    row = opencl.get_global_id(0)
-    col = opencl.get_global_id(1)
+    row = ocl.get_global_id(0)
+    col = ocl.get_global_id(1)
 
     if row < width and col < width:
         tmp = 0.0
@@ -108,9 +107,9 @@ b_flat = b_mat.flatten()
 c_flat = c_mat.flatten()
 
 # Transferir para o dispositivo
-d_a = opencl.to_device(a_flat)
-d_b = opencl.to_device(b_flat)
-d_c = opencl.to_device(c_flat)
+d_a = ocl.to_device(a_flat)
+d_b = ocl.to_device(b_flat)
+d_c = ocl.to_device(c_flat)
 
 # Executar kernel
 block_dim = (16, 16)
@@ -126,17 +125,17 @@ result_mat = result_flat.reshape((width, width))
 
 ```python
 import numpy as np
-from numba_opencl import opencl
+from numba_opencl import ocl
 
-@opencl.jit
+@ocl.jit
 def vector_add(a, b, c):
-    i = opencl.get_global_id(0)
+    i = ocl.get_global_id(0)
     if i < len(c):
         c[i] = a[i] + b[i]
 
 # Criar streams
-stream1 = opencl.stream()
-stream2 = opencl.stream()
+stream1 = ocl.stream()
+stream2 = ocl.stream()
 
 # Executar kernels em streams diferentes
 with stream1:
@@ -172,21 +171,21 @@ profiler.stop()
 ## Gestão de Dispositivos
 
 ```python
-from numba_opencl import opencl
+from numba_opencl import ocl
 
 # Listar dispositivos disponíveis
-devices = opencl.list_devices()
+devices = ocl.list_devices()
 for device in devices:
     print(f"ID: {device['id']}, Nome: {device['name']}, Tipo: {device['type']}")
 
 # Selecionar dispositivo específico
-opencl.select_device(0)  # Selecionar pelo ID
+ocl.select_device(0)  # Selecionar pelo ID
 
 # Selecionar por tipo
-opencl.select_device_by_type('GPU')  # ou 'CPU' ou 'ACCELERATOR'
+ocl.select_device_by_type('GPU')  # ou 'CPU' ou 'ACCELERATOR'
 
 # Obter informações do dispositivo atual
-info = opencl.get_device_info()
+info = ocl.get_device_info()
 print(f"Dispositivo atual: {info['name']} ({info['type']})")
 ```
 
@@ -196,32 +195,32 @@ print(f"Dispositivo atual: {info['name']} ({info['type']})")
 
 #### Configuração e Inicialização
 
-- `opencl.list_devices()`: Lista todos os dispositivos OpenCL disponíveis
-- `opencl.select_device(device_id)`: Seleciona um dispositivo pelo ID
-- `opencl.select_device_by_type(device_type)`: Seleciona um dispositivo pelo tipo
-- `opencl.get_device_info(device_id=None)`: Retorna informações do dispositivo
-- `opencl.print_device_info()`: Imprime informações detalhadas do dispositivo atual
+- `ocl.list_devices()`: Lista todos os dispositivos OpenCL disponíveis
+- `ocl.select_device(device_id)`: Seleciona um dispositivo pelo ID
+- `ocl.select_device_by_type(device_type)`: Seleciona um dispositivo pelo tipo
+- `ocl.get_device_info(device_id=None)`: Retorna informações do dispositivo
+- `ocl.print_device_info()`: Imprime informações detalhadas do dispositivo atual
 
 #### Compilação e Execução
 
-- `opencl.jit(func)`: Decorator para compilar uma função Python em um kernel OpenCL
-- `opencl.synchronize()`: Sincroniza todos os comandos pendentes
-- `opencl.device_count()`: Retorna o número de dispositivos OpenCL disponíveis
+- `ocl.jit(func)`: Decorator para compilar uma função Python em um kernel OpenCL
+- `ocl.synchronize()`: Sincroniza todos os comandos pendentes
+- `ocl.device_count()`: Retorna o número de dispositivos OpenCL disponíveis
 
 #### Funções de Grid/Thread
 
-- `opencl.get_global_id(dim)`: Obtém o ID global da thread atual
-- `opencl.get_local_id(dim)`: Obtém o ID local da thread
-- `opencl.get_group_id(dim)`: Obtém o ID do grupo de trabalho
-- `opencl.get_local_size(dim)`: Obtém o tamanho local do grupo
-- `opencl.get_global_size(dim)`: Obtém o tamanho global
+- `ocl.get_global_id(dim)`: Obtém o ID global da thread atual
+- `ocl.get_local_id(dim)`: Obtém o ID local da thread
+- `ocl.get_group_id(dim)`: Obtém o ID do grupo de trabalho
+- `ocl.get_local_size(dim)`: Obtém o tamanho local do grupo
+- `ocl.get_global_size(dim)`: Obtém o tamanho global
 
 #### Gerenciamento de Memória
 
-- `opencl.to_device(array)`: Transfere um array NumPy para o dispositivo
-- `opencl.device_array(shape, dtype)`: Cria um array vazio no dispositivo
-- `opencl.device_array_like(array)`: Cria um array vazio com a mesma forma e tipo
-- `opencl.shared_array(shape, dtype)`: Cria um array na memória compartilhada
+- `ocl.to_device(array)`: Transfere um array NumPy para o dispositivo
+- `ocl.device_array(shape, dtype)`: Cria um array vazio no dispositivo
+- `ocl.device_array_like(array)`: Cria um array vazio com a mesma forma e tipo
+- `ocl.shared_array(shape, dtype)`: Cria um array na memória compartilhada
 
 #### DeviceArray
 
@@ -232,7 +231,7 @@ print(f"Dispositivo atual: {info['name']} ({info['type']})")
 
 #### Streams
 
-- `opencl.stream()`: Cria um novo stream
+- `ocl.stream()`: Cria um novo stream
 - `stream.synchronize()`: Sincroniza operações no stream
 - `stream.wait_event(event)`: Aguarda um evento
 
